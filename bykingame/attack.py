@@ -3,7 +3,7 @@ import math
 
 
 class Attack:
-    def __init__(self, x, y, target_x, target_y, speed, player_attack):
+    def __init__(self, x, y, target_x, target_y, speed, player_attack, start_time, lifetime=2000):
         """攻撃の初期設定"""
         self.image = pygame.image.load("assets/attack.png").convert_alpha()
 
@@ -15,6 +15,9 @@ class Attack:
 
         # 発射時の位置を記録
         self.start_pos = (x, y)
+        self.start_time = start_time
+        self.lifetime = lifetime
+        self.active = True
         self.player_attack = player_attack
 
         # 攻撃の角度を計算
@@ -27,6 +30,10 @@ class Attack:
         """攻撃の位置を更新する"""
         self.rect.x += self.speed_x
         self.rect.y += self.speed_y
+
+        # 時間切れで消滅
+        if current_time - self.start_time > self.lifetime:
+            self.active = False
 
     def draw(self, screen, camera_x, camera_y):
         """攻撃を画面に描画する"""

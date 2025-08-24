@@ -25,6 +25,7 @@ class Enemy:
         self.move_direction = (0, 0)  # (x方向, y方向)
         self.angle = 0
         self.rotation_speed = 1  # 回転の速さ
+        self.exp_drop = 20  # 敵を倒したときに得られる経験値
 
     def update(self, player_x, player_y, current_time):
         """敵の位置を更新する"""

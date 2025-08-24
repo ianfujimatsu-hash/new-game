@@ -5,15 +5,15 @@ import sys
 from player import Player  # type: ignore
 from attack import Attack  # type: ignore
 from enemy import Enemy  # type: ignore
+from aoe import AoE  # type: ignore
 import math
 import random
+from constants import SCREEN_WIDTH, SCREEN_HEIGHT, SKILL_NONE, SKILL_AOE, SKILL_PIERCE, SKILL_SCATTER  # type: ignore
 
 # Pygameの初期化
 pygame.init()
 
 # 画面設定
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 900
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("ゲームメニュー")
 
@@ -27,7 +27,7 @@ GRID_SIZE = 50
 
 # フォント設定
 try:
-    font_path = "C:\\Windows\\Fonts\\msgothic"
+    font_path = "C:\\Windows\\Fonts\\msgothic.ttc"
     font = pygame.font.Font(font_path, 48)
     small_font = pygame.font.Font(font_path, 30)
 except FileNotFoundError:
@@ -43,6 +43,106 @@ def draw_text(text, font, color, surface, x, y):
     textrect.center = (x, y)
     surface.blit(textobj, textrect)
     return textrect
+
+
+# レベルアップ画面を表示する関数
+
+
+def show_levelup_screen(screen, font, small_font, player, old_stats):
+    # 背景の半透明な黒いオーバーレイを作成
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))  # 半透明な黒色で塗りつぶす
+    screen.blit(overlay, (0, 0))
+
+    draw_text("レベルアップ！", font, WHITE, screen,
+              SCREEN_WIDTH / 2, SCREEN_HEIGHT / 4)
+
+    # 新しいステータスと古いステータスの差分を表示
+    stats_x = SCREEN_WIDTH / 2
+    stats_y = SCREEN_HEIGHT / 2 - 120
+
+    current_stats = player.get_status()
+
+    # レベル
+    draw_text(f"レベル: {old_stats['level']} -> {current_stats['level']}",
+              small_font, WHITE, screen, stats_x, stats_y)
+
+    # 攻撃力
+    draw_text(f"攻撃力: {old_stats['attack']} -> {current_stats['attack']}",
+              small_font, WHITE, screen, stats_x, stats_y + 40)
+
+    # 防御力
+    draw_text(f"防御力: {old_stats['defense']} -> {current_stats['defense']}",
+              small_font, WHITE, screen, stats_x, stats_y + 80)
+
+    # スピード
+    draw_text(f"スピード: {old_stats['speed']:.1f} -> {current_stats['speed']:.1f}",
+              small_font, WHITE, screen, stats_x, stats_y + 120)
+
+    # 最大HP
+    draw_text(f"最大HP: {old_stats['maxHp']} -> {current_stats['maxHp']}",
+              small_font, WHITE, screen, stats_x, stats_y + 160)
+
+    # Enterキーで続行を促すメッセージ
+    draw_text("Enterキーを押して続行", small_font, GRAY, screen,
+              SCREEN_WIDTH / 2, SCREEN_HEIGHT - 100)
+
+    pygame.display.update()
+
+    # キー入力を待機してゲームを一時停止
+    waiting_for_input = True
+    while waiting_for_input:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:  # Enterキーが押されたら
+                    waiting_for_input = False
+
+    # レベル2になったらスキル選択画面を表示
+    if player.get_status()['level'] == 2:
+        show_skill_selection_screen(screen, font, small_font, player)
+
+
+def show_skill_selection_screen(screen, font, small_font, player):
+    """スキル選択画面を表示する関数"""
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 200))
+    screen.blit(overlay, (0, 0))
+
+    draw_text("スキルを選択してください", font, WHITE, screen,
+              SCREEN_WIDTH / 2, SCREEN_HEIGHT / 4)
+
+    # 選択肢のボタンを作成
+    aoe_button = draw_text("1. 範囲攻撃", small_font, WHITE,
+                           screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
+    pierce_button = draw_text(
+        "2. 貫通攻撃", small_font, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60)
+    scatter_button = draw_text(
+        "3. 拡散攻撃", small_font, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 120)
+
+    pygame.display.update()
+
+    waiting_for_selection = True
+    while waiting_for_selection:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    player.skill = SKILL_AOE
+                    print("範囲攻撃を選択しました。")
+                    waiting_for_selection = False
+                elif event.key == pygame.K_2:
+                    player.skill = SKILL_PIERCE
+                    print("貫通攻撃を選択しました。")
+                    waiting_for_selection = False
+                elif event.key == pygame.K_3:
+                    player.skill = SKILL_SCATTER
+                    print("拡散攻撃を選択しました。")
+                    waiting_for_selection = False
 
 # ダメージテキストを管理するクラス
 
@@ -113,6 +213,30 @@ def main_menu():
 
         # 画面を更新
         pygame.display.update()
+
+
+def aoe_skill(player_x, player_y, attacks, damage):
+    """範囲攻撃の処理"""
+    # プレイヤーの中心座標
+    center_x = player_x
+    center_y = player_y
+    radius = 150  # 範囲攻撃の半径
+    lifetime = 500  # 攻撃の持続時間
+
+    new_aoe = AoE(center_x, center_y, radius, damage,
+                  pygame.time.get_ticks(), lifetime)
+    attacks.append(new_aoe)
+    print("範囲攻撃が発動しました！")
+
+
+def pierce_skill():
+    """貫通攻撃の処理"""
+    print("貫通攻撃が発動しました！")
+
+
+def scatter_skill():
+    """拡散攻撃の処理"""
+    print("拡散攻撃が発動しました！")
 
 
 def start_solo_game():
@@ -192,7 +316,16 @@ def start_solo_game():
                     current_time = pygame.time.get_ticks()
                     if current_time-last_e_skill_time >= e_cooldown:
                         print("スキルが発動しました！")
-                        # ここにスキルの処理を追加
+                        # スキルの種類に応じて異なる関数を呼び出す
+                        if player.skill == SKILL_AOE:
+                            aoe_skill(player.x, player.y,
+                                      attacks, player.attack)
+                        elif player.skill == SKILL_PIERCE:
+                            pierce_skill()
+                        elif player.skill == SKILL_SCATTER:
+                            scatter_skill()
+                        else:
+                            print("スキルが選択されていません。")
                         last_e_skill_time = current_time
 
         # キーの状態を取得してキャラクターを移動させる
@@ -247,39 +380,78 @@ def start_solo_game():
             attacks.append(new_attack)
             last_attack_time = current_time
 
+        aoes_to_remove = []
+        for aoe in [a for a in attacks if isinstance(a, AoE)]:
+            aoe.draw(screen, camera_x, camera_y)
+            if not aoe.update(current_time):
+                aoes_to_remove.append(aoe)
+
         # 当たり判定処理
         attacks_to_remove = []
         enemies_to_remove = []
         for attack in attacks:
+            if isinstance(attack, Attack):  # 通常攻撃の当たり判定
+                for enemy in enemies:
+                    if attack.rect.colliderect(enemy.rect):
+                        print("攻撃が敵に当たりました！")
+                        # ダメージテキストを生成
+                        final_damage = attack.calculate_damage(enemy.defense)
+                        damage_texts.append(DamageText(
+                            enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
+
+                        # 敵の体力を減らす
+                        enemy.health -= final_damage
+
+                        # 攻撃を削除リストに追加
+                        attacks_to_remove.append(attack)
+
+                        # 敵の体力が0以下になったら削除リストに追加
+                        if enemy.health <= 0:
+                            enemies_to_remove.append(enemy)
+
+        for aoe in [a for a in attacks if isinstance(a, AoE)]:  # 範囲攻撃の当たり判定
             for enemy in enemies:
-                if attack.rect.colliderect(enemy.rect):
-                    print("攻撃が敵に当たりました！")
-                    # ダメージテキストを生成
-                    final_damage = attack.calculate_damage(enemy.defense)
-                    damage_texts.append(DamageText(
-                        enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
-
-                    # 敵の体力を減らす
-                    enemy.health -= final_damage
-
-                    # 攻撃を削除リストに追加
-                    attacks_to_remove.append(attack)
-
-                    # 敵の体力が0以下になったら削除リストに追加
-                    if enemy.health <= 0:
-                        enemies_to_remove.append(enemy)
+                if aoe.rect.colliderect(enemy.rect):
+                    if not hasattr(aoe, 'hit_enemies') or enemy not in aoe.hit_enemies:
+                        final_damage = aoe.damage - enemy.defense
+                        if final_damage > 0:
+                            damage_texts.append(DamageText(
+                                enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
+                            enemy.health -= final_damage
+                        if enemy.health <= 0:
+                            enemies_to_remove.append(enemy)
+                        if not hasattr(aoe, 'hit_enemies'):
+                            aoe.hit_enemies = [enemy]
+                        else:
+                            aoe.hit_enemies.append(enemy)
 
         # 削除リストを適用
         attacks = [
             attack for attack in attacks if attack not in attacks_to_remove]
+
+        # 経験値とレベルアップ処理
+        old_stats = player.get_status()
+        for enemy in enemies_to_remove:
+            player.gain_experience(enemy.exp_drop)
+            if player.get_status()['level'] > old_stats['level']:
+                show_levelup_screen(
+                    screen, font, small_font, player, old_stats)
+
         enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
 
+       # 敵が倒されたら、新しい敵を生成
+        if not enemies:
+            for _ in range(5):
+                enemy_x = random.randint(-1000, 1000)
+                enemy_y = random.randint(-1000, 1000)
+                enemies.append(Enemy(enemy_x, enemy_y))
+
         # 攻撃の更新と描画
-        for attack in attacks[:]:
-            attack.update()
+        for attack in attacks:
+            attack.update(current_time)
             attack.draw(screen, camera_x, camera_y)
-            if attack.get_distance_from_start() > 500:
-                attacks.remove(attack)
+            if isinstance(attack, Attack) and attack.get_distance_from_start() > 500:
+                attacks_to_remove.append(attack)
 
         # 敵とプレイヤーの当たり判定
         is_invincible = current_time - last_hit_time < invincibility_duration
