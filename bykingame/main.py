@@ -44,6 +44,30 @@ def draw_text(text, font, color, surface, x, y):
     surface.blit(textobj, textrect)
     return textrect
 
+# ダメージテキストを管理するクラス
+
+
+class DamageText:
+    def __init__(self, x, y, damage, start_time):
+        self.x = x
+        self.y = y
+        self.damage = damage
+        self.start_time = start_time
+        self.lifetime = 1000  # 1000ミリ秒（1秒）表示
+
+    def update(self, current_time):
+        # 1秒後に消滅
+        return current_time - self.start_time < self.lifetime
+
+    def draw(self, screen, font, camera_x, camera_y):
+        # カメラオフセットを考慮して描画
+        text = str(self.damage)
+        textobj = font.render(text, True, (255, 0, 0))  # 赤色でダメージ表示
+        textrect = textobj.get_rect(
+            center=(self.x - camera_x, self.y - camera_y - 20))
+        self.y -= 1  # 1フレームごとに上に移動
+        screen.blit(textobj, textrect)
+
 
 def main_menu():
     """メインメニュー画面のループ"""
@@ -149,6 +173,9 @@ def start_solo_game():
         enemy_y = random.randint(-1000, 1000)
         enemies.append(Enemy(enemy_x, enemy_y))
 
+    # ダメージテキストを管理するリスト
+    damage_texts = []
+
     # キャラクターの初期位置と速度
     clock = pygame.time.Clock()
 
@@ -227,8 +254,13 @@ def start_solo_game():
             for enemy in enemies:
                 if attack.rect.colliderect(enemy.rect):
                     print("攻撃が敵に当たりました！")
+                    # ダメージテキストを生成
+                    final_damage = attack.calculate_damage(enemy.defense)
+                    damage_texts.append(DamageText(
+                        enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
+
                     # 敵の体力を減らす
-                    enemy.health -= attack.damage
+                    enemy.health -= final_damage
 
                     # 攻撃を削除リストに追加
                     attacks_to_remove.append(attack)
@@ -238,12 +270,9 @@ def start_solo_game():
                         enemies_to_remove.append(enemy)
 
         # 削除リストを適用
-        for attack in attacks_to_remove:
-            if attack in attacks:
-                attacks.remove(attack)
-        for enemy in enemies_to_remove:
-            if enemy in enemies:
-                enemies.remove(enemy)
+        attacks = [
+            attack for attack in attacks if attack not in attacks_to_remove]
+        enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
 
         # 攻撃の更新と描画
         for attack in attacks[:]:
@@ -255,7 +284,10 @@ def start_solo_game():
         # 敵とプレイヤーの当たり判定
         is_invincible = current_time - last_hit_time < invincibility_duration
         for enemy in enemies:
+            enemy.update(player.x, player.y, current_time)
+            # 敵のHPバーを描画
             enemy.draw(screen, camera_x, camera_y)
+
             # 無敵時間中ではないかチェック
             if player_rect.colliderect(enemy.rect) and not is_invincible:
                 print("プレイヤーが敵と衝突しました！")
@@ -280,7 +312,7 @@ def start_solo_game():
         # キャラクターの座標を左下に表示
         coords_text = f"X: {int(player.x)}, Y: {int(player.y)}"
         draw_text(coords_text, small_font, BLACK,
-                  screen, 120, SCREEN_HEIGHT - 30)
+                  screen, 140, SCREEN_HEIGHT - 30)
 
         # HPバーの描画
         hp_bar_width = 200
@@ -332,6 +364,18 @@ def start_solo_game():
 
             # 完成したSurfaceをメイン画面に貼り付け
             screen.blit(cooldown_surface, (40, SCREEN_HEIGHT - 120))
+
+        # ダメージテキストの更新と描画
+        damage_texts_to_remove = []
+        for text in damage_texts:
+            if text.update(current_time):
+                text.draw(screen, small_font, camera_x, camera_y)
+            else:
+                damage_texts_to_remove.append(text)
+
+        for text in damage_texts_to_remove:
+            if text in damage_texts:
+                damage_texts.remove(text)
 
         # 画面を更新
         pygame.display.update()

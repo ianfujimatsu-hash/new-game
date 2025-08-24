@@ -5,7 +5,7 @@ class Player:
         self.level = 1
         self.attack = 10
         self.defense = 5
-        self.speed = 10
+        self.speed = 1
         self.maxHp = 100
         self.currentHp = self.maxHp
         self.experience = 0
