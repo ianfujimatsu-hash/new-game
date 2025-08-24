@@ -1,0 +1,30 @@
+# player.py
+class Player:
+    def __init__(self):
+        """プレイヤーキャラクターのステータスを初期化する"""
+        self.level = 1
+        self.attack = 10
+        self.defense = 5
+        self.speed = 10
+        self.maxHp = 100
+        self.currentHp = self.maxHp
+        self.experience = 0
+        self.experienceToNextLevel = 100
+
+        # キャラクターの座標
+        self.x = 0
+        self.y = 0
+
+    def get_status(self):
+        """現在のステータスを返す"""
+        return {
+            "level": self.level,
+            "attack": self.attack,
+            "defense": self.defense,
+            "speed": self.speed,
+            "maxHp": self.maxHp,
+            "currentHp": self.currentHp,
+            "experience": self.experience,
+            "experienceToNextLevel": self.experienceToNextLevel,
+        }
+        pass
