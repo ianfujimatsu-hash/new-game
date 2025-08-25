@@ -376,7 +376,7 @@ def start_solo_game():
 
             # player.attackをAttackクラスに渡す
             new_attack = Attack(player_center_x, player_center_y,
-                                mouse_abs_x, mouse_abs_y, 10, player.attack)
+                                mouse_abs_x, mouse_abs_y, 10, player.attack,current_time)
             attacks.append(new_attack)
             last_attack_time = current_time
 

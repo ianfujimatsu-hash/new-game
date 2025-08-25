@@ -26,7 +26,7 @@ class Attack:
         self.speed_x = math.cos(angle) * speed
         self.speed_y = math.sin(angle) * speed
 
-    def update(self):
+    def update(self, current_time):
         """攻撃の位置を更新する"""
         self.rect.x += self.speed_x
         self.rect.y += self.speed_y
