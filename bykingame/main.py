@@ -6,6 +6,8 @@ from player import Player  # type: ignore
 from attack import Attack  # type: ignore
 from enemy import Enemy  # type: ignore
 from aoe import AoE  # type: ignore
+from pierce import PierceAttack # type: ignore
+from scatter import ScatterAttack # type: ignore
 import math
 import random
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT, SKILL_NONE, SKILL_AOE, SKILL_PIERCE, SKILL_SCATTER  # type: ignore
@@ -215,13 +217,14 @@ def main_menu():
         pygame.display.update()
 
 
-def aoe_skill(player_x, player_y, attacks, damage):
+def aoe_skill(player_x, player_y, attacks, player_attack):
     """範囲攻撃の処理"""
     # プレイヤーの中心座標
     center_x = player_x
     center_y = player_y
     radius = 150  # 範囲攻撃の半径
-    lifetime = 500  # 攻撃の持続時間
+    lifetime = 3000     # 3秒で消滅
+    damage = player_attack * 3  # 基本ダメージを攻撃力×3に設定
 
     new_aoe = AoE(center_x, center_y, radius, damage,
                   pygame.time.get_ticks(), lifetime)
@@ -229,14 +232,46 @@ def aoe_skill(player_x, player_y, attacks, damage):
     print("範囲攻撃が発動しました！")
 
 
-def pierce_skill():
+def pierce_skill(player, attacks, camera_x, camera_y):
     """貫通攻撃の処理"""
+    mouse_x, mouse_y = pygame.mouse.get_pos()
+    # マウスの絶対座標
+    target_x = mouse_x + camera_x
+    target_y = mouse_y + camera_y
+
+    new_pierce = PierceAttack(
+        player.x, player.y,
+        target_x, target_y,
+        speed=15,
+        player_attack=player.attack,
+        player_width=80,  # プレイヤーの当たり判定サイズと揃える
+        player_height=80
+    )
+    attacks.append(new_pierce)
     print("貫通攻撃が発動しました！")
 
-
-def scatter_skill():
+def scatter_skill(player, player_img_orig, attacks, mouse_x, mouse_y):
     """拡散攻撃の処理"""
     print("拡散攻撃が発動しました！")
+    
+    # 3つの攻撃を異なる角度で生成
+    angles = [-0.1, 0, 0.1]  # ラジアンで角度をずらす（約5.7度ずつ）
+    speed = 10
+    
+    player_center_x = player.x
+    player_center_y = player.y
+    
+    base_angle = math.atan2(mouse_y - player_center_y, mouse_x - player_center_x)
+    
+    for angle_offset in angles:
+        current_angle = base_angle + angle_offset
+        
+        # ターゲット座標を計算
+        target_x = player_center_x + math.cos(current_angle) * 1000
+        target_y = player_center_y + math.sin(current_angle) * 1000
+        
+        new_scatter = ScatterAttack(player_center_x, player_center_y, target_x, target_y, speed, player.attack, player_img_orig.get_width(), player_img_orig.get_height())
+        attacks.append(new_scatter)
 
 
 def start_solo_game():
@@ -321,9 +356,12 @@ def start_solo_game():
                             aoe_skill(player.x, player.y,
                                       attacks, player.attack)
                         elif player.skill == SKILL_PIERCE:
-                            pierce_skill()
+                            pierce_skill(player, attacks, camera_x, camera_y)
                         elif player.skill == SKILL_SCATTER:
-                            scatter_skill()
+                            mouse_x, mouse_y = pygame.mouse.get_pos()
+                            mouse_abs_x = mouse_x + (player.x - SCREEN_WIDTH / 2)
+                            mouse_abs_y = mouse_y + (player.y - SCREEN_HEIGHT / 2)
+                            scatter_skill(player, player_img_orig, attacks, mouse_abs_x, mouse_abs_y)
                         else:
                             print("スキルが選択されていません。")
                         last_e_skill_time = current_time
@@ -382,9 +420,13 @@ def start_solo_game():
 
         aoes_to_remove = []
         for aoe in [a for a in attacks if isinstance(a, AoE)]:
-            aoe.draw(screen, camera_x, camera_y)
-            if not aoe.update(current_time):
+            if not aoe.update(current_time):  # 先に寿命判定
                 aoes_to_remove.append(aoe)
+            else:
+                aoe.draw(screen, camera_x, camera_y)  # 生きてるときだけ描画
+
+        # ここでAoEをattacksから削除する処理を追加
+        attacks = [a for a in attacks if a not in aoes_to_remove]
 
         # 当たり判定処理
         attacks_to_remove = []
@@ -396,11 +438,10 @@ def start_solo_game():
                         print("攻撃が敵に当たりました！")
                         # ダメージテキストを生成
                         final_damage = attack.calculate_damage(enemy.defense)
-                        damage_texts.append(DamageText(
-                            enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
-
-                        # 敵の体力を減らす
-                        enemy.health -= final_damage
+                        if final_damage > 0:
+                            damage_texts.append(DamageText(enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
+                            # 敵の体力を減らす
+                            enemy.health -= final_damage
 
                         # 攻撃を削除リストに追加
                         attacks_to_remove.append(attack)
@@ -409,25 +450,61 @@ def start_solo_game():
                         if enemy.health <= 0:
                             enemies_to_remove.append(enemy)
 
-        for aoe in [a for a in attacks if isinstance(a, AoE)]:  # 範囲攻撃の当たり判定
-            for enemy in enemies:
-                if aoe.rect.colliderect(enemy.rect):
-                    if not hasattr(aoe, 'hit_enemies') or enemy not in aoe.hit_enemies:
-                        final_damage = aoe.damage - enemy.defense
-                        if final_damage > 0:
-                            damage_texts.append(DamageText(
-                                enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
-                            enemy.health -= final_damage
-                        if enemy.health <= 0:
-                            enemies_to_remove.append(enemy)
-                        if not hasattr(aoe, 'hit_enemies'):
-                            aoe.hit_enemies = [enemy]
-                        else:
-                            aoe.hit_enemies.append(enemy)
+            elif isinstance(attack, AoE):  # 範囲攻撃の当たり判定
+                for enemy in enemies:
+                    if attack.rect.colliderect(enemy.rect):
+                        if not hasattr(attack, 'hit_enemies') or enemy not in attack.hit_enemies:
+                            # ダメージ計算
+                            final_damage = attack.damage - enemy.defense
+                            if final_damage > 0:
+                                damage_texts.append(DamageText(
+                                    enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
+                                enemy.health -= final_damage
+                            if enemy.health <= 0:
+                                enemies_to_remove.append(enemy)
 
+                            # 同じAoEで二重ヒットしないよう記録
+                            if not hasattr(attack, 'hit_enemies'):
+                                attack.hit_enemies = [enemy]
+                            else:
+                                attack.hit_enemies.append(enemy)
+
+            elif isinstance(attack, PierceAttack): # 貫通攻撃の当たり判定
+                for enemy in enemies:
+                    if attack.rect.colliderect(enemy.rect):
+                        if not hasattr(attack, 'hit_enemies') or enemy not in attack.hit_enemies:
+                            final_damage = attack.calculate_damage(enemy.defense)
+                            if final_damage > 0:
+                                damage_texts.append(DamageText(
+                                    enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
+                                enemy.health -= final_damage
+                            if enemy.health <= 0:
+                                enemies_to_remove.append(enemy)
+                            if not hasattr(attack, 'hit_enemies'):
+                                attack.hit_enemies = [enemy]
+                            else:
+                                attack.hit_enemies.append(enemy)
+
+            elif isinstance(attack, ScatterAttack):  # 拡散攻撃の当たり判定
+                for enemy in enemies:
+                    if attack.rect.colliderect(enemy.rect):
+                        if enemy not in attack.hit_enemies:
+                            final_damage = attack.calculate_damage(enemy.defense)
+                            if final_damage > 0:
+                                damage_texts.append(DamageText(
+                                    enemy.rect.centerx, enemy.rect.centery, final_damage, current_time))
+                                enemy.health -= final_damage
+                            if enemy.health <= 0:
+                                enemies_to_remove.append(enemy)
+                            attack.hit_enemies.append(enemy)
+                            
+        for attack in attacks:
+            if isinstance(attack, PierceAttack) and attack.get_distance_from_start() > 1000:
+                attacks_to_remove.append(attack)
         # 削除リストを適用
-        attacks = [
-            attack for attack in attacks if attack not in attacks_to_remove]
+        attacks = [attack for attack in attacks if attack not in attacks_to_remove and attack not in aoes_to_remove]
+        enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
+        
 
         # 経験値とレベルアップ処理
         old_stats = player.get_status()
@@ -437,22 +514,33 @@ def start_solo_game():
                 show_levelup_screen(
                     screen, font, small_font, player, old_stats)
 
-        enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
-
        # 敵が倒されたら、新しい敵を生成
         if not enemies:
             for _ in range(5):
-                enemy_x = random.randint(-1000, 1000)
-                enemy_y = random.randint(-1000, 1000)
+                enemy_x = random.randint(-500, 500)
+                enemy_y = random.randint(-500, 500)
                 enemies.append(Enemy(enemy_x, enemy_y))
 
         # 攻撃の更新と描画
+        attacks_to_remove = []
         for attack in attacks:
-            attack.update(current_time)
+            attack.update(current_time) if hasattr(attack, "update") else None
             attack.draw(screen, camera_x, camera_y)
-            if isinstance(attack, Attack) and attack.get_distance_from_start() > 500:
-                attacks_to_remove.append(attack)
+            
+        # 寿命が切れたものを削除リストに追加
+        if isinstance(attack, Attack) and not attack.active:
+            attacks_to_remove.append(attack)
 
+        # 射程オーバーで消す場合
+        elif isinstance(attack, Attack) and attack.get_distance_from_start() > 500:
+            attacks_to_remove.append(attack)
+
+        if isinstance(attack, PierceAttack) and attack.get_distance_from_start() > 700:
+            attacks_to_remove.append(attack)
+
+        # リストから削除
+        attacks = [a for a in attacks if a not in attacks_to_remove]
+        
         # 敵とプレイヤーの当たり判定
         is_invincible = current_time - last_hit_time < invincibility_duration
         for enemy in enemies:

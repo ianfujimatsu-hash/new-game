@@ -20,5 +20,6 @@ class AoE:
 
     def draw(self, screen, camera_x, camera_y):
         """範囲攻撃を画面に描画する（円形のエフェクト）"""
-        pygame.draw.circle(screen, (255, 100, 100, 100), (int(
-            self.x - camera_x), int(self.y - camera_y)), self.radius)
+        surf = pygame.Surface((self.radius*2, self.radius*2), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (255, 100, 100, 100), (self.radius, self.radius), self.radius)
+        screen.blit(surf, (int(self.x - camera_x - self.radius), int(self.y - camera_y - self.radius)))

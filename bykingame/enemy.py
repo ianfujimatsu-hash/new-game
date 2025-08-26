@@ -16,7 +16,7 @@ class Enemy:
         self.y = y
         self.rect = self.image.get_rect(center=(self.x, self.y))
         self.speed = 0.5
-        self.max_health = 100
+        self.max_health = 50
         self.health = self.max_health
         self.attack = 5
         self.defense = 2
