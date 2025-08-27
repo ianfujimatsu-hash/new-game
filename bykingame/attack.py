@@ -5,10 +5,10 @@ import math
 class Attack:
     def __init__(self, x, y, target_x, target_y, speed, player_attack, start_time, lifetime=2000):
         """攻撃の初期設定"""
-        self.image = pygame.image.load("assets/attack.png").convert_alpha()
+        self.image = pygame.image.load("assets/attack01.png").convert_alpha()
 
         # サイズを調整
-        self.image = pygame.transform.scale(self.image, (20, 20))
+        self.image = pygame.transform.scale(self.image, (40, 40))
 
         # 攻撃の初期位置を渡された中心座標に設定
         self.rect = self.image.get_rect(center=(x, y))

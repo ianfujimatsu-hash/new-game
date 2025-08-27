@@ -270,7 +270,11 @@ def scatter_skill(player, player_img_orig, attacks, mouse_x, mouse_y):
         target_x = player_center_x + math.cos(current_angle) * 1000
         target_y = player_center_y + math.sin(current_angle) * 1000
         
-        new_scatter = ScatterAttack(player_center_x, player_center_y, target_x, target_y, speed, player.attack, player_img_orig.get_width(), player_img_orig.get_height())
+        new_scatter = ScatterAttack(
+            player_center_x, player_center_y,
+            target_x, target_y,
+            speed, player.attack
+        )
         attacks.append(new_scatter)
 
 
@@ -279,7 +283,7 @@ def start_solo_game():
     print("ソロゲームを開始します...")
     # キャラクター画像の読み込み
     try:
-        player_img_orig = pygame.image.load("assets/bykin.png").convert_alpha()
+        player_img_orig = pygame.image.load("assets/player.png").convert_alpha()
         player_img_orig = pygame.transform.scale(player_img_orig, (150, 150))
         e_img_orig = pygame.image.load("assets/E.png").convert_alpha()
         e_img_orig = pygame.transform.scale(e_img_orig, (60, 60))
@@ -292,7 +296,7 @@ def start_solo_game():
         # クールダウンタイマー用のSurface
         cooldown_surface = pygame.Surface((60, 60), pygame.SRCALPHA)
     except FileNotFoundError:
-        print("エラー：assets/bykin.pngが見つかりません。")
+        print("エラー：assets/player.pngが見つかりません。")
         # 画像が見つからなければ関数を終了
         return
 
@@ -386,17 +390,17 @@ def start_solo_game():
         camera_y = player.y - SCREEN_HEIGHT / 2
 
         # 画面を塗りつぶす
-        screen.fill(WHITE)
+        screen.fill(GRAY)
 
         # グリッドの描画
         # 横線
         for y in range(0, SCREEN_HEIGHT + GRID_SIZE, GRID_SIZE):
-            pygame.draw.line(screen, GRAY, (0 - camera_x % GRID_SIZE, y - camera_y %
+            pygame.draw.line(screen, BLACK, (0 - camera_x % GRID_SIZE, y - camera_y %
                              GRID_SIZE), (SCREEN_WIDTH, y - camera_y % GRID_SIZE))
 
         # 縦線
         for x in range(0, SCREEN_WIDTH + GRID_SIZE, GRID_SIZE):
-            pygame.draw.line(screen, GRAY, (x - camera_x % GRID_SIZE, 0 - camera_y %
+            pygame.draw.line(screen, BLACK, (x - camera_x % GRID_SIZE, 0 - camera_y %
                              GRID_SIZE), (x - camera_x % GRID_SIZE, SCREEN_HEIGHT))
 
         # 攻撃の発射
@@ -414,7 +418,7 @@ def start_solo_game():
 
             # player.attackをAttackクラスに渡す
             new_attack = Attack(player_center_x, player_center_y,
-                                mouse_abs_x, mouse_abs_y, 10, player.attack,current_time)
+                                mouse_abs_x, mouse_abs_y, 5, player.attack,current_time)
             attacks.append(new_attack)
             last_attack_time = current_time
 
@@ -497,15 +501,15 @@ def start_solo_game():
                             if enemy.health <= 0:
                                 enemies_to_remove.append(enemy)
                             attack.hit_enemies.append(enemy)
-                            
-        for attack in attacks:
-            if isinstance(attack, PierceAttack) and attack.get_distance_from_start() > 1000:
-                attacks_to_remove.append(attack)
+            
+                            # 攻撃を削除リストに追加
+                            attacks_to_remove.append(attack)
+                            break  # ← 同じ弾で他の敵に当たらないようループ終了
+
         # 削除リストを適用
         attacks = [attack for attack in attacks if attack not in attacks_to_remove and attack not in aoes_to_remove]
         enemies = [enemy for enemy in enemies if enemy not in enemies_to_remove]
         
-
         # 経験値とレベルアップ処理
         old_stats = player.get_status()
         for enemy in enemies_to_remove:
@@ -536,6 +540,9 @@ def start_solo_game():
             attacks_to_remove.append(attack)
 
         if isinstance(attack, PierceAttack) and attack.get_distance_from_start() > 700:
+            attacks_to_remove.append(attack)
+
+        if isinstance(attack, ScatterAttack) and attack.get_distance_from_start() > 700:
             attacks_to_remove.append(attack)
 
         # リストから削除

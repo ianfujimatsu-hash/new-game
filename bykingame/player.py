@@ -6,9 +6,9 @@ class Player:
     def __init__(self):
         """プレイヤーキャラクターのステータスを初期化する"""
         self.level = 1
-        self.attack = 100
+        self.attack = 10
         self.defense = 5
-        self.speed = 10
+        self.speed = 1
         self.maxHp = 100
         self.currentHp = self.maxHp
         self.experience = 0
@@ -36,7 +36,7 @@ class Player:
         # ステータスを上昇させる
         self.attack += 2
         self.defense += 1
-        self.speed += 0.2
+        self.speed += 0.01
         self.maxHp += 10
         self.currentHp = self.maxHp  # HPを全回復
 

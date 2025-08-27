@@ -5,8 +5,8 @@ import math
 class PierceAttack:
     def __init__(self, x, y, target_x, target_y, speed, player_attack, player_width, player_height):
         """貫通攻撃の初期設定"""
-        self.image = pygame.image.load("assets/skill_attack.png").convert_alpha()
-        self.image = pygame.transform.scale(self.image, (20, 20)) # サイズを調整
+        self.image = pygame.image.load("assets/skill_attack01.png").convert_alpha()
+        self.image = pygame.transform.scale(self.image, (40, 40)) # サイズを調整
         
         attack_start_x = x + player_width / 2
         attack_start_y = y + player_height / 2
