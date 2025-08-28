@@ -163,7 +163,7 @@ class DamageText:
 
     def draw(self, screen, font, camera_x, camera_y):
         # カメラオフセットを考慮して描画
-        text = str(self.damage)
+        text = str(int(self.damage))
         textobj = font.render(text, True, (255, 0, 0))  # 赤色でダメージ表示
         textrect = textobj.get_rect(
             center=(self.x - camera_x, self.y - camera_y - 20))
@@ -216,6 +216,20 @@ def main_menu():
         # 画面を更新
         pygame.display.update()
 
+def is_colliding(x, y, player_rect, enemies):
+    """指定された座標がプレイヤーまたは他の敵と衝突しているか判定する"""
+    new_enemy_rect = pygame.Rect(x, y, 120, 120) # 敵の画像サイズに合わせて調整
+    
+    # プレイヤーとの衝突判定
+    if new_enemy_rect.colliderect(player_rect):
+        return True
+    
+    # 他の敵との衝突判定
+    for enemy in enemies:
+        if new_enemy_rect.colliderect(enemy.rect):
+            return True
+            
+    return False
 
 def aoe_skill(player_x, player_y, attacks, player_attack):
     """範囲攻撃の処理"""
@@ -256,7 +270,7 @@ def scatter_skill(player, player_img_orig, attacks, mouse_x, mouse_y):
     
     # 3つの攻撃を異なる角度で生成
     angles = [-0.1, 0, 0.1]  # ラジアンで角度をずらす（約5.7度ずつ）
-    speed = 10
+    speed = 5
     
     player_center_x = player.x
     player_center_y = player.y
@@ -331,9 +345,16 @@ def start_solo_game():
 
     # 敵関連の変数
     enemies = []
-    for _ in range(5):  # 5体の敵を生成
-        enemy_x = random.randint(-1000, 1000)
-        enemy_y = random.randint(-1000, 1000)
+    player_image_rect = player_img_orig.get_rect(center=(player.x, player.y))
+    for _ in range(5):# 5体の敵を生成
+        is_pos_found = False
+        while not is_pos_found:
+            enemy_x = random.randint(player.x - 1500, player.x + 1500)
+            enemy_y = random.randint(player.y - 1500, player.y + 1500)
+            
+            # プレイヤーから200ピクセル以上離れているかチェック
+            if math.hypot(enemy_x - player.x, enemy_y - player.y) > 200:
+                is_pos_found = not is_colliding(enemy_x, enemy_y, player_image_rect, enemies)
         enemies.append(Enemy(enemy_x, enemy_y))
 
     # ダメージテキストを管理するリスト
@@ -531,20 +552,18 @@ def start_solo_game():
             attack.update(current_time) if hasattr(attack, "update") else None
             attack.draw(screen, camera_x, camera_y)
             
-        # 寿命が切れたものを削除リストに追加
-        if isinstance(attack, Attack) and not attack.active:
-            attacks_to_remove.append(attack)
-
-        # 射程オーバーで消す場合
-        elif isinstance(attack, Attack) and attack.get_distance_from_start() > 500:
-            attacks_to_remove.append(attack)
-
-        if isinstance(attack, PierceAttack) and attack.get_distance_from_start() > 700:
-            attacks_to_remove.append(attack)
-
-        if isinstance(attack, ScatterAttack) and attack.get_distance_from_start() > 700:
-            attacks_to_remove.append(attack)
-
+            # 通常攻撃の射程距離による消去
+            if isinstance(attack, Attack) and attack.get_distance_from_start() > 500:
+                attacks_to_remove.append(attack)
+            # AoEの寿命による消去
+            if isinstance(attack, AoE) and not attack.update(current_time):
+                attacks_to_remove.append(attack)
+            # 貫通攻撃の射程距離による消去
+            if isinstance(attack, PierceAttack) and attack.get_distance_from_start() > 1000:
+                attacks_to_remove.append(attack)
+            # 拡散攻撃の射程距離による消去
+            if isinstance(attack, ScatterAttack) and attack.get_distance_from_start() > 500:
+                attacks_to_remove.append(attack)
         # リストから削除
         attacks = [a for a in attacks if a not in attacks_to_remove]
         
