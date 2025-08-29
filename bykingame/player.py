@@ -1,5 +1,6 @@
 # player.py
 from constants import SKILL_NONE
+from item import ITEM_TYPE_EQUIPMENT, ITEM_TYPE_MATERIAL, ITEM_TYPE_CONSUMABLE
 
 
 class Player:
@@ -8,7 +9,7 @@ class Player:
         self.level = 1
         self.attack = 10
         self.defense = 5
-        self.speed = 10
+        self.speed = 1
         self.maxHp = 100
         self.currentHp = self.maxHp
         self.experience = 0
@@ -19,7 +20,12 @@ class Player:
         self.y = 0
         # スキルを初期化
         self.skill = SKILL_NONE
-
+        # インベントリ
+        self.inventory = {
+            ITEM_TYPE_EQUIPMENT: [],
+            ITEM_TYPE_MATERIAL: [],
+            ITEM_TYPE_CONSUMABLE: []
+        }
     def gain_experience(self, exp):
         """経験値を獲得する"""
         self.experience += exp
@@ -54,4 +60,11 @@ class Player:
             "experience": self.experience,
             "experienceToNextLevel": self.experienceToNextLevel,
         }
+    def add_item_to_inventory(self, item):
+        """アイテムをインベントリに追加する"""
+        if item.item_type in self.inventory:
+            self.inventory[item.item_type].append(item)
+        else:
+            self.inventory[item.item_type] = [item]
+
         pass

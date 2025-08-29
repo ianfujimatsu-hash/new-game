@@ -11,6 +11,7 @@ from scatter import ScatterAttack # type: ignore
 import math
 import random
 from constants import SCREEN_WIDTH, SCREEN_HEIGHT, SKILL_NONE, SKILL_AOE, SKILL_PIERCE, SKILL_SCATTER  # type: ignore
+from item import Item, ITEM_TYPE_EQUIPMENT, ITEM_TYPE_MATERIAL, ITEM_TYPE_CONSUMABLE # type: ignore
 
 # Pygameの初期化
 pygame.init()
@@ -291,6 +292,101 @@ def scatter_skill(player, player_img_orig, attacks, mouse_x, mouse_y):
         )
         attacks.append(new_scatter)
 
+def show_inventory_screen(screen, font, small_font, player):
+    """インベントリ画面を表示する関数"""
+    overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 200))
+    screen.blit(overlay, (0, 0))
+
+    draw_text("インベントリ", font, WHITE, screen,
+              SCREEN_WIDTH / 8, SCREEN_HEIGHT / 10)
+    
+    # --- インベントリ枠の描画（10x10グリッド） ---
+    slots_cols = 10
+    slots_rows = 10
+    slot_size = 40    # 1マスのサイズ
+    slot_margin = 8   # マス間のスペース
+    slots_start_x = SCREEN_WIDTH / 20   # 画面左端から余裕を持たせて
+    slots_start_y = SCREEN_HEIGHT / 10 + 60  # 「インベントリ」文字の下
+
+    # 今回は最初のアイテムを選択状態に（本格的な選択操作は後述）
+    selected_index = 0 if hasattr(player, "inventory") and player.inventory else None
+
+    for row in range(slots_rows):
+        for col in range(slots_cols):
+            rect_x = slots_start_x + col * (slot_size + slot_margin)
+            rect_y = slots_start_y + row * (slot_size + slot_margin)
+            slot_rect = pygame.Rect(rect_x, rect_y, slot_size, slot_size)
+            # 選択中は色を変える
+            idx = row * slots_cols + col
+            if selected_index == idx:
+                pygame.draw.rect(screen, (255, 255, 0), slot_rect, 3) # 黄色
+            else:
+                pygame.draw.rect(screen, WHITE, slot_rect, 2)
+            if hasattr(player, "inventory") and idx < len(player.inventory):
+                inv = player.inventory[idx]
+                item = inv["item"]
+                count = inv["count"]
+                if item.image:
+                    img_x = rect_x + (slot_size - item.image.get_width()) // 2
+                    img_y = rect_y + (slot_size - item.image.get_height()) // 2
+                    screen.blit(item.image, (img_x, img_y))
+                    # 個数表示
+                    count_text = str(count)
+                    count_surface = small_font.render(count_text, True, WHITE)
+                    screen.blit(count_surface, (rect_x + slot_size - 20, rect_y + slot_size - 26))
+
+    # --- 右側にアイテム詳細欄を描画 ---
+    info_x = slots_start_x + slots_cols * (slot_size + slot_margin) + 40
+    info_y = slots_start_y
+
+    # 選択中アイテムの情報を表示
+    if hasattr(player, "inventory") and player.inventory and selected_index is not None and selected_index < len(player.inventory):
+        selected_item = player.inventory[selected_index]["item"]
+        selected_count = player.inventory[selected_index]["count"]
+        # 名前
+        draw_text(f"名前: {selected_item.name}", small_font, WHITE, screen, info_x + 100, info_y + 20)
+        # 種別
+        draw_text(f"種別: {selected_item.item_type}", small_font, WHITE, screen, info_x + 100, info_y + 60)
+        # 個数
+        draw_text(f"個数: {selected_count}", small_font, WHITE, screen, info_x + 100, info_y + 100)
+        # 説明（バイオジェルの場合は固定で表示）
+        desc = ""
+        if selected_item.name == "バイオゲル":
+            desc = "HPを10%回復"
+        else:
+            desc = "説明がありません"
+        draw_text(f"説明: {desc}", small_font, WHITE, screen, info_x + 120, info_y + 160)
+    else:
+        draw_text("アイテムがありません", small_font, WHITE, screen, info_x + 100, info_y + 40)
+
+    # プレイヤーの現在のステータスを表示
+    current_stats = player.get_status()
+    stats_x = SCREEN_WIDTH - 200
+    stats_y = SCREEN_HEIGHT / 10
+
+    draw_text(f"レベル: {current_stats['level']}", small_font, WHITE, screen, stats_x, stats_y)
+    draw_text(f"攻撃力: {current_stats['attack']}", small_font, WHITE, screen, stats_x, stats_y + 40)
+    draw_text(f"防御力: {current_stats['defense']}", small_font, WHITE, screen, stats_x, stats_y + 80)
+    draw_text(f"スピード: {current_stats['speed']:.1f}", small_font, WHITE, screen, stats_x, stats_y + 120)
+    draw_text(f"HP: {current_stats['currentHp']}/{current_stats['maxHp']}", small_font, WHITE, screen, stats_x, stats_y + 160)
+    draw_text(f"経験値: {current_stats['experience']}/{current_stats['experienceToNextLevel']}", small_font, WHITE, screen, stats_x, stats_y + 200)
+
+    # 閉じるためのメッセージ
+    draw_text("Tabキーを押してゲームに戻る", small_font, GRAY, screen,
+              SCREEN_WIDTH / 2, SCREEN_HEIGHT - 100)
+
+    pygame.display.update()
+
+    waiting_for_close = True
+    while waiting_for_close:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_TAB:
+                    waiting_for_close = False
 
 def start_solo_game():
     """ソロゲームの開始関数"""
@@ -346,16 +442,27 @@ def start_solo_game():
     # 敵関連の変数
     enemies = []
     player_image_rect = player_img_orig.get_rect(center=(player.x, player.y))
-    for _ in range(5):# 5体の敵を生成
+    for _ in range(5):  # 5体の敵を生成
         is_pos_found = False
         while not is_pos_found:
-            enemy_x = random.randint(player.x - 1500, player.x + 1500)
-            enemy_y = random.randint(player.y - 1500, player.y + 1500)
-            
-            # プレイヤーから200ピクセル以上離れているかチェック
+            # 極座標で円周内をランダムに選ぶ（より均等な分布）
+            theta = random.uniform(0, 2 * math.pi)
+            r = random.uniform(0, 500)
+            enemy_x = math.cos(theta) * r
+            enemy_y = math.sin(theta) * r
+
+            # プレイヤーから200ピクセル以上離れているか
             if math.hypot(enemy_x - player.x, enemy_y - player.y) > 200:
-                is_pos_found = not is_colliding(enemy_x, enemy_y, player_image_rect, enemies)
+                # 他の敵・プレイヤーと重なっていないか
+                if not is_colliding(enemy_x, enemy_y, player_image_rect, enemies):
+                    is_pos_found = True
         enemies.append(Enemy(enemy_x, enemy_y))
+    
+    # アイテムドロップ用リスト
+    dropped_items = []
+
+     # インベントリ（アイテムリスト）
+    player.inventory = [] 
 
     # ダメージテキストを管理するリスト
     damage_texts = []
@@ -390,6 +497,10 @@ def start_solo_game():
                         else:
                             print("スキルが選択されていません。")
                         last_e_skill_time = current_time
+                        
+                # Tabキーが押されたらインベントリを開く
+                if event.key == pygame.K_TAB:
+                    show_inventory_screen(screen, font, small_font, player)
 
         # キーの状態を取得してキャラクターを移動させる
         keys = pygame.key.get_pressed()
@@ -534,6 +645,15 @@ def start_solo_game():
         # 経験値とレベルアップ処理
         old_stats = player.get_status()
         for enemy in enemies_to_remove:
+            # 50%の確率で消耗品アイテムをドロップ
+            if random.random() < 0.5:
+                item = Item("バイオゲル", ITEM_TYPE_CONSUMABLE, "assets/Biogel_consumable.png")
+                # ドロップ位置は敵の中心
+                dropped_items.append({
+                    "item": item,
+                    "x": enemy.rect.centerx,
+                    "y": enemy.rect.centery
+                })
             player.gain_experience(enemy.exp_drop)
             if player.get_status()['level'] > old_stats['level']:
                 show_levelup_screen(
@@ -588,6 +708,38 @@ def start_solo_game():
         # キャラクターの描画
         player_draw_x = SCREEN_WIDTH / 2 - player_img_orig.get_width() / 2
         player_draw_y = SCREEN_HEIGHT / 2 - player_img_orig.get_height() / 2
+
+        # --- ドロップアイテムの取得判定 ---
+        items_to_remove = []
+        for dropped in dropped_items:
+            item_rect = pygame.Rect(
+                dropped["x"] - 20,  # 32x32画像なら中心合わせ
+                dropped["y"] - 20,
+                40,
+                40
+            )
+            if player_rect.colliderect(item_rect):
+                # 既に同じアイテムがある場合はカウントを増やす
+                found = False
+                for inv in player.inventory:
+                    if inv["item"].name == dropped["item"].name:
+                        inv["count"] += 1
+                        found = True
+                        break
+                if not found:
+                    player.inventory.append({"item": dropped["item"], "count": 1})
+                items_to_remove.append(dropped)
+                # 取得演出やSEなどが必要ならここで追加
+        for dropped in items_to_remove:
+            dropped_items.remove(dropped)
+
+        # --- ドロップアイテムの描画 ---
+        for dropped in dropped_items:
+            item = dropped["item"]
+            x = dropped["x"] - camera_x - (item.image.get_width() // 2)
+            y = dropped["y"] - camera_y - (item.image.get_height() // 2)
+            if item.image:
+                screen.blit(item.image, (x, y))
 
         # 無敵時間中は点滅
         if is_invincible and current_time % 400 < 200:
